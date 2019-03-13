@@ -1,0 +1,131 @@
+#加载需要的包
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+
+#导入数据
+test <- read_csv("D:/Code/R/Bike Sharing Demand/test.csv")
+bike <- read_csv("D:/Code/R/Bike Sharing Demand/train.csv")
+
+#数据概览
+str(bike)
+summary(bike)
+
+#数据预处理：特征因子化
+bike$season<-factor(bike$season,labels=c('Spring','Summer','Fall','Winter'))
+bike$weather<-factor(bike$weather,labels=c('Good','Normal','Bad','Very Bad'))
+bike$hour<-factor(hour(bike$datetime))
+bike$year<-factor(year(bike$datetime))
+bike$month<-factor(month(bike$datetime))
+bike$holiday<-factor(bike$holiday)
+bike$workingday<-factor(bike$workingday)
+
+#数据分析
+#可视化相关系数
+library(corrplot)
+correlation=cor(bike[c(6:12)]) 
+correlation
+correlation%>%corrplot()
+
+#时间维度特征
+#日期与租借数量
+bike%>%ggplot(aes(datetime,count))+geom_point()+theme_bw()
+#年份与租借数量
+bike%>%ggplot(aes(year,count,fill=year))+geom_boxplot(alpha=0.62,show.legend = FALSE)+theme_bw()+theme(aspect.ratio = 1)
+bike%>%group_by(year)%>%summarise(ynum=mean(count))%>%ggplot(aes(year,ynum,fill=year))+geom_bar(alpha=0.62,stat='identity',width=0.38,show.legend = FALSE)+theme_bw()+theme(aspect.ratio=1)
+#月份与租借数量            
+bike%>%ggplot(aes(month,count,fill=month))+geom_boxplot(alpha=0.62,show.legend = FALSE)+theme_bw()+theme(aspect.ratio = 1)
+bike%>%group_by(month)%>%summarise(mnum=mean(count))%>%ggplot(aes(month,mnum,fill=month))+geom_bar(alpha=0.62,stat='identity',width=0.8,show.legend = FALSE)+theme_bw()+theme(aspect.ratio=1)
+#季节与租借数量 
+bike%>%ggplot(aes(season,count,fill=season))+geom_boxplot(alpha=0.62,show.legend = FALSE)+theme_bw()+theme(aspect.ratio = 1)
+bike%>%group_by(season)%>%summarise(Snum=mean(count))%>%ggplot(aes(season,Snum,fill=season))+geom_bar(stat='identity',width=0.5,show.legend = FALSE,alpha=0.62)+theme_bw()+theme(aspect.ratio=1)
+bike%>%group_by(season)%>%summarise(Snum=mean(count))%>%ggplot(aes(x=reorder(season,Snum,FUN=median),y=Snum,fill=season))+geom_bar(alpha=0.62,stat='identity',width=0.9)+theme(aspect.ratio=1)+coord_polar(theta='y')+theme_minimal()+labs(x='season',y='count')
+bike%>%group_by(season,hour)%>%summarise(n=mean(count))%>%ggplot(aes(x=hour,y=n,color=season))+geom_point()+geom_line(aes(group=season),size=0.8)+theme_bw()
+#一天中时间与租借数量
+bike%>%ggplot(aes(x=hour,y=count,color=hour))+geom_boxplot(aes(x=reorder(hour,count,FUN = median),y=count),show.legend=FALSE,alpha=0.62)+theme_bw()
+bike%>%group_by(hour)%>%summarise(Hnum=mean(count))%>%
+  ggplot(aes(x=hour,y=Hnum,fill=hour))+geom_bar(alpha=0.62,stat='identity',show.legend=FALSE)+theme_bw()
+#星期与租借数量
+bike<-bike%>%mutate(wday=wday(datetime,label=TRUE))
+bike%>%group_by(wday,hour)%>%summarise(n=mean(count))%>%ggplot(aes(x=hour,y=n,color=wday))+geom_point()+geom_line(aes(group=wday),size=0.75)+theme_bw()
+#工作日、周末、节假日与租借数量
+bike%>%group_by(holiday)%>%summarise(count=mean(count))%>%ggplot()+geom_bar(aes(x=holiday,y=count,fill=holiday),stat='identity',alpha=0.62,width=0.62)+theme_bw()+theme(legend.position='top',aspect.ratio=1)
+bike%>%group_by(workingday)%>%summarise(count=mean(count))%>%ggplot()+geom_bar(aes(x=workingday,y=count,fill=workingday),stat='identity',alpha=0.62,width=0.62)+theme_bw()+theme(legend.position='top',aspect.ratio=1)
+bike%>%group_by(holiday,hour)%>%summarise(Hnum=mean(count))%>%ggplot(aes(hour,Hnum,color=holiday))+geom_line(aes(group=holiday),size=1)+geom_point()+theme_bw()
+bike%>%group_by(workingday,hour)%>%summarise(Hnum=mean(count))%>%ggplot(aes(hour,Hnum,color=workingday))+geom_line(aes(group=workingday),size=1)+geom_point()+theme_bw()
+
+#天气维度特征
+#天气与租借数量
+bike%>%group_by(weather,hour)%>%summarise(n=mean(count))%>%ggplot(aes(x=hour,y=n,color=weather))+geom_point()+geom_line(aes(group=weather),size=1)+theme_bw()
+bike%>%ggplot(aes(weather,count,fill=weather))+geom_boxplot(show.legend=FALSE,alpha=0.62)+theme_bw()+theme(aspect.ratio = 1)
+#具体天气因素（温度、湿度、风速）与租借数量
+#温度
+bike%>%ggplot(aes(temp))+geom_histogram(color='white',fill='red',alpha=0.5,binwidth=2)+theme_bw()
+bike%>%ggplot(aes(temp))+geom_freqpoly(color='red',binwidth=1,size=1)+theme_bw()
+#湿度
+bike%>%ggplot(aes(humidity))+geom_histogram(color='white',fill='red',alpha=0.5,binwidth=5)+theme_bw()
+#风速
+bike%>%ggplot(aes(windspeed))+geom_histogram(color='white',fill='red',alpha=0.5,binwidth=5)+theme_bw()
+
+#注册非注册维度
+#分析casual，registered分别在星期、时间特征下的表现
+#注册与非注册用户在不同星期的租借数量
+bike%>%ggplot(aes(x=wday,y=registered,fill=wday))+geom_boxplot(show.legend=FALSE,alpha=0.62)+theme_bw()
+bike%>%ggplot(aes(x=wday,y=casual,fill=wday))+geom_boxplot(show.legend=FALSE,alpha=0.62)+theme_bw()
+#注册与非注册用户在不同时间的租借数量
+bike%>%group_by(hour)%>%summarise(RHnum=mean(registered))%>%ggplot(aes(hour,RHnum,fill=hour))+geom_bar(alpha=0.75,stat='identity',show.legend=FALSE)+theme_bw()
+bike%>%group_by(hour)%>%summarise(CHnum=mean(casual))%>%ggplot(aes(hour,CHnum,fill=hour))+geom_bar(stat='identity',show.legend=FALSE,alpha=0.75)+theme_bw()
+
+#分析季节与天气变量的交互效应
+bike%>%count(season,weather)%>%ggplot(aes(season,weather))+geom_tile(aes(fill=n))+theme_bw()
+
+#模型建立与预测
+#训练集特征工程
+#将温度分为4类
+bike$temp_tree[bike$temp<10]=1
+bike$temp_tree[bike$temp>=10&bike$temp<20]=2
+bike$temp_tree[bike$temp>=20&bike$temp<30]=3
+bike$temp_tree[bike$temp>=30]=4
+#将湿度分为4类
+bike$humidity_tree[bike$humidity<25]=1
+bike$humidity_tree[bike$humidity>=25&bike$temp<50]=2
+bike$humidity_tree[bike$humidity>=50&bike$temp<75]=3
+bike$humidity_tree[bike$humidity>=75]=4
+#将风速分为3类
+bike$windsp_tree[bike$windspeed<20]=1
+bike$windsp_tree[bike$windspeed>=20&bike$temp<40]=2
+bike$windsp_tree[bike$windspeed>=40&bike$temp<60]=3
+
+#测试集特征工程
+test$weather<-factor(test$weather,labels=c('Good','Normal','Bad','Very Bad'))
+test$hour<-factor(hour(test$datetime))
+test$year<-factor(year(test$datetime))
+test$month<-factor(month(test$datetime))
+test$holiday<-factor(test$holiday)
+test$workingday<-factor(test$workingday)
+#将温度分为4类
+test$temp_tree[test$temp<10]=1
+test$temp_tree[test$temp>=10&test$temp<20]=2
+test$temp_tree[test$temp>=20&test$temp<30]=3
+test$temp_tree[test$temp>=30]=4
+#将湿度分为4类
+test$humidity_tree[test$humidity<25]=1
+test$humidity_tree[test$humidity>=25&test$temp<50]=2
+test$humidity_tree[test$humidity>=50&test$temp<75]=3
+test$humidity_tree[test$humidity>=75]=4
+#将风速分为3类
+test$windsp_tree[test$windspeed<20]=1
+test$windsp_tree[test$windspeed>=20&test$temp<40]=2
+test$windsp_tree[test$windspeed>=40&test$temp<60]=3
+
+#构建模型以及预测
+install.packages('randomForest')
+library(randomForest)
+set.seed(451)
+bike$logreg<-log(bike$count+1)
+ranF<-randomForest(logreg~year+month+hour+workingday+holiday+weather+temp_tree+humidity_tree+windsp_tree,data=bike,importance=TRUE,ntree=250)
+logpred<-predict(ranF,test)
+test$count<-exp(logpred)-1
+submit_final<-data.frame(datetime=test$datetime,count=test$count)
+write.csv(submit_final,file = 'D:/Code/R/Bike Sharing Demand/submit_final.csv',fileEncoding='GBK',row.names = F)
